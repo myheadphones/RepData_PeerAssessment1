@@ -1,0 +1,106 @@
+---
+title: "PA1_template"
+---
+
+###Loading and preprocessing the data
+
+Set up any initial parameters, load the data into 'activity' and format the date column
+
+```{r setup}
+library(dplyr)
+library(lubridate)
+library(chron)
+par(mfcol = c(1,1))
+activity <- tbl_df(read.csv("activity.csv", na.strings = "NA"))
+mutate(activity,date = ymd(date))
+head(activity)
+```
+
+###What is mean total number of steps taken per day?
+
+Histogram of the total number of steps per day
+
+```{r first_histogram}
+activity_sum_steps <- summarize(group_by(activity,date), sum = sum(steps, na.rm = TRUE))
+hist(activity_sum_steps$sum, main = "Activity", xlab = "Total steps each day", ylab = "Frequency (number of days with those steps)")
+```
+
+Calculate the mean and median of the total steps per day
+
+```{r mean_median}
+mean(activity_sum_steps$sum)
+median(activity_sum_steps$sum)
+```
+
+###What is the average daily activity pattern?
+
+Time-series plot of the 5-min interval and the average steps taken averaged across all days
+
+```{r average_daily_activity}
+activity_ave_steps <- summarize(group_by(activity,interval), ave = mean(steps, na.rm = TRUE))
+plot(activity_ave_steps$interval, activity_ave_steps$ave, type="l",
+     main = "Average Daily Activity", xlab = "5-min Interval", ylab = "Average steps taken")
+```
+
+5-min interval that has the maximum number of steps, on average
+
+```{r max_interval}
+activity_ave_steps[activity_ave_steps$ave==max(activity_ave_steps$ave),]
+```
+
+###Inputing missing values
+
+Total number of missing values
+
+```{r total_missing_values}
+colSums(is.na(activity))
+```
+
+The strategy for filling in the missing values will be to use the mean for that 5-min interval.
+
+Here is the new data set with the missing data filled in using that strategy.
+
+```{r nas_replaced}
+activity_nas_replaced <- mutate(activity, steps = ifelse(is.na(activity$steps),activity_ave_steps$ave,activity$steps))
+activity_nas_replaced
+```
+
+Histogram of the total number of steps taken each day, along with the mean and median.
+
+For comparison purposes, the two graphs are displayed side by side, which shows that adding the missing NA values did impact the results.
+By adding in the new values, the histogram increases the frequency significantly for the first and third bars.
+
+```{r nas_replaced_sum_steps}
+activity_nas_replaced_sum_steps <- summarize(group_by(activity_nas_replaced,date), sum = sum(steps, na.rm = TRUE))
+
+par(mfcol = c(1,2))
+hist(activity_sum_steps$sum, main = "Activity (Original Plot)\nNAs removed",
+     xlab = "Total steps each day", ylab = "Frequency (number of days with those steps)", ylim = c(0,40))
+hist(activity_nas_replaced_sum_steps$sum, main = "Activity (New Plot)\nNAs replaced with interval mean",
+     xlab = "Total steps each day", ylab = "Frequency (number of days with those steps)", ylim = c(0,40))
+```
+
+###Are there differences in activity patterns between weekdays and weekends?
+
+Create new factor with "weekday" and "weekend" levels
+
+```{r nas_replaced_with_weekdays}
+activity_nas_replaced_with_weekdays <- mutate(activity_nas_replaced, weekdays = ifelse(is.weekend(date),"weekend","weekday"))
+table(activity_nas_replaced_with_weekdays$weekdays)
+```
+
+2-panel time series plot for both levels
+
+```{r weekdays_breakdown_for_nas_replaced_with_weekdays}
+par(mfcol = c(2,1))
+activity_nas_replaced_with_weekdays_ave_steps <- summarize(group_by(activity_nas_replaced_with_weekdays,interval,weekdays),
+                                                           ave = mean(steps, na.rm = TRUE))
+with(subset(activity_nas_replaced_with_weekdays_ave_steps,weekdays == c("weekend")),
+     plot(interval,ave, type ="l",
+          main = "weekend", xlab = "Interval", ylab = "Number of steps"))
+with(subset(activity_nas_replaced_with_weekdays_ave_steps,weekdays == c("weekday")),
+     plot(interval,ave, type ="l",
+          main = "weekday", xlab = "Interval", ylab = "Number of steps"))     
+```
+
+That's all folks!
